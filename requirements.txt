@@ -1,0 +1,4 @@
+# Dependency script evaluasi (evaluation/run_eval.py) - terpisah dari system/requirements.txt
+pandas
+python-dotenv
+httpx
