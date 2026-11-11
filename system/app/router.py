@@ -31,6 +31,22 @@ _STATUS_WORDS = (
 # Pertanyaan 'cara ...' tanpa nomor tiket = pertanyaan prosedur (FAQ), bukan cek tiket
 _HOWTO_PREFIX = re.compile(r"^\s*(bagaimana|gimana|cara|apa(kah)?|kenapa|mengapa|berapa)\b", re.IGNORECASE)
 
+# [FIX ISSUE-05] 'tiket saya gimana ya?': menyebut tiket milik sendiri tanpa nomor -> cek status (minta nomor tiket),
+# kecuali kalimatnya tentang MEMBUAT/prosedur tiket (cara, buat, ajukan, ...)
+_OWN_TICKET_RE = re.compile(r"\b(?:tiket|ticket)\w*\s+(?:yang\s+)?(?:saya|aku|ku|gue|gw|kami)\b", re.IGNORECASE)
+_CREATE_WORDS = ("cara", "prosedur", "membuat", "buat ", "bikin", "ajukan", "mengajukan", "submit", "kirim", "sla")
+
+# [FIX ISSUE-03] sapaan/terima kasih murni tidak perlu retrieval + LLM (hemat embedding call dan ~330 token per pesan)
+_SMALLTALK_RE = re.compile(
+    r"^\s*(?:halo+|hai+|hi+|hello|hey|p|permisi|selamat\s+(?:pagi|siang|sore|malam)|assalamu'?alaikum|terima\s*kasih|makasih|thanks?|thx|ok(?:e|ay)?)"
+    r"(?:\s+(?:kak|pak|bu|mas|mba|min|admin|bot|helpdesk|semua|tim|ya+|dong|deh|banyak))*[\s!.,?]*$",
+    re.IGNORECASE,
+)
+SMALLTALK_REPLY = (
+    "Halo! Saya asisten IT Helpdesk & HR internal. Saya bisa membantu soal cuti, password, perangkat, "
+    "dan cek status tiket (contoh: 'status TICKET-0002'). Ada yang bisa dibantu?"
+)
+
 VALID_INTENTS = {"faq", "ticket_status"}
 
 INTENT_PROMPT = """Klasifikasikan pesan karyawan berikut ke dalam tepat satu kategori:
@@ -50,6 +66,8 @@ def detect_intent_keyword(query: str) -> str:
     has_ticket_word = any(w in q for w in _TICKET_WORDS)
     has_status_word = any(w in q for w in _STATUS_WORDS)
     if has_ticket_word and has_status_word and not _HOWTO_PREFIX.match(query):
+        return "ticket_status"
+    if _OWN_TICKET_RE.search(query) and not any(w in q for w in _CREATE_WORDS):
         return "ticket_status"
     return "faq"
 
@@ -82,6 +100,8 @@ def extract_ticket_id(query: str) -> str | None:
 
 async def handle_query(query: str) -> dict:
     """Dipanggil endpoint /ask. Mengembalikan dict {status, intent, data}."""
+    if _SMALLTALK_RE.match(query or ""):
+        return {"status": "success", "intent": "smalltalk", "data": SMALLTALK_REPLY}
     intent = await detect_intent(query)
 
     if intent == "ticket_status":
