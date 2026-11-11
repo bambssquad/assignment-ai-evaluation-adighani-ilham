@@ -1,0 +1,24 @@
+name: import-system
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Salin sistem Assignment 4 ke system/ (satu kali)
+        run: |
+          if [ -d system ]; then echo "system/ sudah ada"; exit 0; fi
+          git clone https://github.com/bambssquad/assignment-helpdesk-agent-adighani-ilham /tmp/ia4
+          git -C /tmp/ia4 checkout c80f599
+          mkdir system
+          cd /tmp/ia4 && cp -r app data Dockerfile .env.example requirements.txt .dockerignore "$GITHUB_WORKSPACE/system/"
+          cd "$GITHUB_WORKSPACE"
+          git config user.name bambssquad
+          git config user.email 137799776+bambssquad@users.noreply.github.com
+          git add -A
+          git commit -m "Baseline: salin sistem Assignment 4 (commit c80f599) ke system/ sebelum evaluasi"
+          git push
